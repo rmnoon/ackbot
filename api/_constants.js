@@ -6,6 +6,8 @@ export const signingSecret = process.env.SLACK_SIGNING_SECRET
 const redisURL = process.env.UPSTASH_REDIS_REST_URL
 const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
 
+console.log('foobar', Redis);
+
 export const redis = new Redis({
   url: redisURL,
   token: redisToken,
