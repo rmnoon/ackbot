@@ -1,14 +1,13 @@
 import { Redis } from '@upstash/redis';
+import { WebClient } from '@slack/web-api';
 
-export const token = process.env.SLACK_BOT_TOKEN;
-export const signingSecret = process.env.SLACK_SIGNING_SECRET;
+export const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 
-const redisURL = process.env.UPSTASH_REDIS_REST_URL;
-const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-
-console.log('foobar', Redis);
+export const SLACK_TOKEN = process.env.SLACK_BOT_TOKEN;
 
 export const redis = new Redis({
-	url: redisURL,
-	token: redisToken,
+	url: process.env.UPSTASH_REDIS_REST_URL,
+	token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
+
+export const slack = new WebClient(SLACK_TOKEN);

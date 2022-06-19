@@ -1,14 +1,6 @@
 import type { VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
-import { token } from './_constants';
-
-export function tokenizeString(string: string) {
-	const array = string.split(' ').filter((element) => {
-		return element !== '';
-	});
-	console.log('Tokenized version:', array);
-	return array;
-}
+import { SLACK_TOKEN } from './_constants';
 
 export async function postToChannel(channel: string, res: VercelResponse, payload: string) {
 	console.log('channel:', channel);
@@ -27,7 +19,7 @@ export async function postToChannel(channel: string, res: VercelResponse, payloa
 			method: 'post',
 			headers: {
 				'Content-Type': 'application/json; charset=utf-8',
-				Authorization: `Bearer ${token}`,
+				Authorization: `Bearer ${SLACK_TOKEN}`,
 			},
 			body: JSON.stringify(message),
 		});
@@ -54,7 +46,7 @@ async function channelNameToId(channelName: string) {
 			method: 'post',
 			headers: {
 				'Content-Type': 'application/json; charset=utf-8',
-				Authorization: `Bearer ${token}`,
+				Authorization: `Bearer ${SLACK_TOKEN}`,
 			},
 		});
 		const data: { channels: { name: string, id: string }[] } = await response.json();
