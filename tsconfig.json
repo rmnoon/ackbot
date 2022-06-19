@@ -1,0 +1,16 @@
+{
+    // NOTE: These options are overridden in webpack.config.js.
+    "compilerOptions": {
+        "moduleResolution": "node",
+        "noEmitOnError": true,
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noUnusedParameters": false,
+        "suppressImplicitAnyIndexErrors": true,
+        "target": "ES6",
+        "useUnknownInCatchVariables": true,
+    },
+    "exclude": [
+        "node_modules"
+    ]
+}
