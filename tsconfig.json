@@ -8,7 +8,6 @@
         "noUnusedParameters": false,
         "suppressImplicitAnyIndexErrors": true,
         "target": "ES6",
-        "useUnknownInCatchVariables": true,
     },
     "exclude": [
         "node_modules"
