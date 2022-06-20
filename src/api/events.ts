@@ -1,10 +1,12 @@
 import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AppMentionEvent, SlackRequest, Block, AnyEvent, ReactionAddedEvent, ReactionRemovedEvent } from './_SlackJson';
-import { isValidSlackRequest } from './_util';
+import { isValidSlackRequest, map } from './_util';
 
 /** if true we'll echo debug information in slack, too */
 const DEBUG_LOG_TO_SLACK = true;
+
+const DEFAULT_CONCURRENCY = 3;
 
 export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	const body: SlackRequest = req.body;
@@ -81,14 +83,15 @@ async function checkMessageAcks(channel: string, ts: string) {
 	}
 
 	const usersShouldReact = new Set(mentions.userIds);
-	for (const groupId of mentions.userGroupIds) {
+
+	map(mentions.userGroupIds, async groupId => {
 		const groupResp = await slack.usergroups.users.list({
 			usergroup: groupId
 		});
 		for (const user of groupResp.users || []) {
 			usersShouldReact.add(user);
 		}
-	}
+	}, DEFAULT_CONCURRENCY);
 
 	if (usersShouldReact.has(thisBotId)) {
 		// react from the bot to acknowledge the request and to prevent us from DM'ing ourselves
@@ -107,21 +110,19 @@ async function checkMessageAcks(channel: string, ts: string) {
 
 	const usersToPing = [...usersShouldReact].filter(u => !usersDidReact.has(u));
 
-	const permalinkResponse = await slack.chat.getPermalink({
+	const permalink = (await slack.chat.getPermalink({
 		channel: channel,
 		message_ts: ts,
-	});
-	const permalinkUrl = permalinkResponse.permalink;
+	})).permalink;
 
-	await log({ channel, threadTs: ts }, 'ready to send reminders', { message, mentions, reactions, usersDidReact: [...usersDidReact], usersShouldReact: [...usersShouldReact], usersToPing, permalinkResponse });
+	await log({ channel, threadTs: ts }, 'ready to send reminders', { message, mentions, reactions, usersDidReact: [...usersDidReact], usersShouldReact: [...usersShouldReact], usersToPing });
 
-	for (const userToPing of usersToPing) {
+	map(usersToPing, async userToPing => {
 		await slack.chat.postMessage({
 			channel: userToPing,
-			text: `<@${message.user}> requested that you acknowledge this message by reacting to it: ${permalinkUrl}`
+			text: `<@${message.user}> requested that you acknowledge this message by reacting to it: ${permalink}`
 		});
-	}
-
+	}, DEFAULT_CONCURRENCY);
 }
 
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
