@@ -57,6 +57,7 @@ async function onReaction(event: ReactionAddedEvent | ReactionRemovedEvent): Pro
 }
 
 async function checkMessageAcks(channel: string, ts: string) {
+	const thisUser = await slack.users.identity({});
 
 	const history = await slack.conversations.history({
 		channel: channel,
@@ -64,7 +65,7 @@ async function checkMessageAcks(channel: string, ts: string) {
 		limit: 1,
 		inclusive: true
 	});
-	await log({ channel, threadTs: ts }, 'checking message', { history });
+	await log({ channel, threadTs: ts }, 'checking message', { history, thisUser });
 
 	const message = history.messages[0];
 	const mentions = getUsersAndGroupMentions(message.blocks as Block[]);
@@ -87,7 +88,6 @@ async function checkMessageAcks(channel: string, ts: string) {
 		}
 	}
 
-	const thisUser = await slack.users.identity({});
 	if (usersShouldReact.has(thisUser.user.id)) {
 		// react from the bot to acknowledge the request and to prevent us from DM'ing ourselves
 		await slack.reactions.add({
