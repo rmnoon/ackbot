@@ -1,7 +1,7 @@
 import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
-import { AppMentionEvent, SlackRequest, Block, AnyEvent } from './_SlackJson';
+import { AppMentionEvent, SlackRequest, Block, AnyEvent, ReactionAddedEvent, ReactionRemovedEvent } from './_SlackJson';
 import { AckRequest } from './_AckJson';
 
 /** if true we'll try and echo the event somewhere relevant into slack to aid debugging */
@@ -18,13 +18,13 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	}
 
 	if (!isValidSlackRequest(req, SLACK_SIGNING_SECRET)) {
-		console.error('Invalid slack request', req);
+		console.error('Invalid slack request', { req });
 		res.status(403).send({});
 		return;
 	}
 
 	if (body.type !== 'event_callback') {
-		console.error('Unexpected request type', req);
+		console.error('Unexpected request type', { req });
 		res.status(400).send({});
 		return;
 	}
@@ -35,17 +35,19 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 		let code = 400;
 		switch (body.event.type) {
 			case 'app_mention': ({ response, code } = await onAppMention(body.event)); break;
+			case 'reaction_added': ({ response, code } = await onReaction(body.event)); break;
+			case 'reaction_removed': ({ response, code } = await onReaction(body.event)); break;
 			default: break;
 		}
 		res.status(code).send(response);
 	} catch (e) {
-		console.log('Unexpected error: ', e);
+		console.log('Unexpected error: ', { e });
 		res.status(500).send({ msg: 'Unexpected error' });
 	}
 }
 
 async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown, code: number }> {
-	console.log('onAppMention: ', event);
+	console.log('onAppMention: ', { event });
 
 	const req: AckRequest = {
 		channel: event.channel,
@@ -78,6 +80,25 @@ async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown
 	return { code: 200, response: {} };
 }
 
+async function onReaction(event: ReactionAddedEvent | ReactionRemovedEvent): Promise<{ response: unknown, code: number }> {
+	console.log('onReaction: ', { event });
+	await checkMessageAcks(event.item.channel, event.item.ts);
+	return { code: 200, response: {} };
+}
+
+async function checkMessageAcks(channel: string, ts: string) {
+	console.log('checkMessageAcks', { channel, ts });
+
+	const history = await slack.conversations.history({
+		channel: channel,
+		latest: ts,
+		limit: 1,
+		inclusive: true
+	});
+
+	console.log('history: ', { history });
+}
+
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
 	let userIds: string[] = [];
 	let userGroupIds: string[] = [];
@@ -98,7 +119,7 @@ function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGro
 				if (Array.isArray(elements)) {
 					const recursed = getUsersAndGroupMentions(elements);
 					userIds = [...new Set([...userIds, ...recursed.userIds])];
-					userGroupIds = [...new Set([...userGroupIds, ...recursed.userGroupIds])];			
+					userGroupIds = [...new Set([...userGroupIds, ...recursed.userGroupIds])];
 				}
 				break;
 		}
@@ -144,7 +165,7 @@ async function checkDebugEcho(event: AnyEvent) {
 				}
 			}
 		]
-	});	
+	});
 }
 
 function isValidSlackRequest(event: VercelRequest, signingSecret: string): boolean {
