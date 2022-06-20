@@ -1,6 +1,6 @@
-import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { AppMentionEvent, SlackRequest, Block, AnyEvent, ReactionAddedEvent, ReactionRemovedEvent } from './_SlackJson';
+import { slack, SLACK_SIGNING_SECRET } from './_constants';
+import { AnyEvent, AppMentionEvent, Block, ReactionAddedEvent, ReactionRemovedEvent, SlackRequest } from './_SlackJson';
 import { isValidSlackRequest, map } from './_util';
 
 /** if true we'll echo debug information in slack, too */
@@ -59,6 +59,7 @@ async function onReaction(event: ReactionAddedEvent | ReactionRemovedEvent): Pro
 }
 
 async function checkMessageAcks(channel: string, ts: string) {
+
 	const thisBotId = (await slack.auth.test({})).user_id;
 
 	const history = await slack.conversations.history({
