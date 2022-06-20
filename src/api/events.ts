@@ -66,10 +66,12 @@ async function checkMessageAcks(channel: string, ts: string) {
 		inclusive: true
 	});
 	await log({ channel, threadTs: ts }, 'checking message', { history, thisBotId });
-
 	const message = history.messages[0];
+	if (!message) {
+		await log({ channel, threadTs: ts }, 'missing message, deleted?', { history, thisBotId });
+	}
 	const mentions = getUsersAndGroupMentions(message.blocks as Block[]);
-	const reactions = message.reactions;
+	const reactions = message.reactions || [];
 
 	const usersDidReact = new Set<string>();
 	for (const r of reactions) {
@@ -101,25 +103,20 @@ async function checkMessageAcks(channel: string, ts: string) {
 
 	const usersToPing = [...usersShouldReact].filter(u => !usersDidReact.has(u));
 
-	await log({ channel, threadTs: ts }, 'ready to send reminders', { message, mentions, reactions, usersDidReact: [...usersDidReact], usersShouldReact: [...usersShouldReact], usersToPing });
+	const permalinkResponse = await slack.chat.getPermalink({
+		channel: channel,
+		message_ts: ts,
+	});
+	const permalinkUrl = permalinkResponse.permalink;
 
-	// await bluebird.map(usersToPing, async userToPing => {
-	// 	await slack.chat.postMessage({
-	// 		channel: userToPing,
-	// 		text: 'Please ack',
-	// 		blocks: [
-	// 			{
-	// 				type: 'section',
-	// 				text: {
-	// 					type: 'mrkdwn',
-	// 					text: 'Please ack',
-	// 				}
-	// 			},
-	// 		]
-	// 	});
-	// }, { concurrency: DEFAULT_CONCURRENCY });
+	await log({ channel, threadTs: ts }, 'ready to send reminders', { message, mentions, reactions, usersDidReact: [...usersDidReact], usersShouldReact: [...usersShouldReact], usersToPing, permalinkResponse });
 
-
+	for (const userToPing of usersToPing) {
+		await slack.chat.postMessage({
+			channel: userToPing,
+			text: `<@${message.user}> requested that you acknowledge this message by reacting to it: ${permalinkUrl}`
+		});
+	}
 }
 
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
