@@ -57,7 +57,7 @@ async function onReaction(event: ReactionAddedEvent | ReactionRemovedEvent): Pro
 }
 
 async function checkMessageAcks(channel: string, ts: string) {
-	const thisUser = await slack.auth.test({});
+	const thisBotId = (await slack.auth.test({})).user_id;
 
 	const history = await slack.conversations.history({
 		channel: channel,
@@ -65,7 +65,7 @@ async function checkMessageAcks(channel: string, ts: string) {
 		limit: 1,
 		inclusive: true
 	});
-	await log({ channel, threadTs: ts }, 'checking message', { history, thisUser });
+	await log({ channel, threadTs: ts }, 'checking message', { history, thisBotId });
 
 	const message = history.messages[0];
 	const mentions = getUsersAndGroupMentions(message.blocks as Block[]);
@@ -88,15 +88,15 @@ async function checkMessageAcks(channel: string, ts: string) {
 		}
 	}
 
-	if (usersShouldReact.has(thisUser.bot_id)) {
+	if (usersShouldReact.has(thisBotId)) {
 		// react from the bot to acknowledge the request and to prevent us from DM'ing ourselves
 		await slack.reactions.add({
 			channel: channel,
 			timestamp: ts,
 			name: 'thumbsup',
 		});
-		usersDidReact.add(thisUser.bot_id);
-		usersShouldReact.delete(thisUser.bot_id);
+		usersDidReact.add(thisBotId);
+		usersShouldReact.delete(thisBotId);
 	}
 
 	const usersToPing = [...usersShouldReact].filter(u => !usersDidReact.has(u));
