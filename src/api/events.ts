@@ -2,6 +2,7 @@ import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
 import { AppMentionEvent, SlackRequest, Block } from './_SlackJson';
+import { AckRequest } from './_AckJson';
 
 export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	const body: SlackRequest = req.body;
@@ -40,15 +41,9 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 }
 
 async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown, code: number }> {
-	console.log('mention', event);
-	const channel = event.channel;
-	const ts = event.ts;
-
 	console.log('onAppMention: ', event);
 
-	await pingUsersToReact(channel, ts);
-
-	// echo for debug reasons
+	// echo for debug on message types
 	if (isEchoRequest(event)) {
 		await slack.chat.postMessage({
 			channel: event.channel,
@@ -73,6 +68,13 @@ async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown
 		return { code: 200, response: {} };
 	}
 
+	const req: AckRequest = {
+		channel: event.channel,
+		ts: event.ts,
+		thread_ts: event.thread_ts,
+	};
+	const mentions = getUsersAndGroupMentions(event.blocks);
+
 	await slack.chat.postMessage({
 		channel: event.channel,
 		thread_ts: event.thread_ts || undefined,
@@ -88,13 +90,39 @@ async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown
 				"type": "section",
 				"text": {
 					"type": "mrkdwn",
-					"text": "```" + JSON.stringify(event, null, 2) + "```"
+					"text": "```" + JSON.stringify({ event, req, mentions }, null, 2) + "```"
 				}
 			}
 		]
 	});
 
 	return { code: 200, response: {} };
+}
+
+function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
+	let userIds: string[] = [];
+	let userGroupIds: string[] = [];
+
+	for (const block of blocks || []) {
+		switch (block.type) {
+			case 'rich_text':
+			case 'rich_text_section':
+				const recursed = getUsersAndGroupMentions(block.elements);
+				userIds = [...new Set([...userIds, ...recursed.userIds])];
+				userGroupIds = [...new Set([...userGroupIds, ...recursed.userGroupIds])];
+				break;
+			case 'user':
+				userIds.push(block.user_id);
+				break;
+			case 'usergroup':
+				userGroupIds.push(block.usergroup_id);
+				break;
+			default:
+				break;
+		}
+	}
+
+	return { userIds, userGroupIds };
 }
 
 function isEchoRequest(event: AppMentionEvent): boolean {
@@ -109,27 +137,6 @@ function isEchoRequest(event: AppMentionEvent): boolean {
 		}
 	}
 	return false;
-}
-
-async function pingUsersToReact(channel: string, ts: string): Promise<void> {
-	console.log('pinging users to react: ', channel, ts);
-	// who needs to react?
-	// const shouldReact = new Set<string>();
-
-	// // who has reacted?
-	// const hasReacted = new Set<string>();
-	// const reactionsResp = await slack.reactions.get({
-	// 	channel: channel,
-	// 	timestamp: ts,
-	// 	full: true
-	// });
-	// for (const reaction of reactionsResp?.message?.reactions || []) {
-	// 	for (const reactor of reaction.users) {
-	// 		hasReacted.add(reactor);
-	// 	}
-	// }
-
-	return;
 }
 
 function isValidSlackRequest(event: VercelRequest, signingSecret: string): boolean {
