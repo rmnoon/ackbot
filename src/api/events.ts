@@ -1,8 +1,7 @@
 import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
-import { AppMentionEvent, SlackRequest } from './_SlackJson';
-
+import { AppMentionEvent, SlackRequest, Block } from './_SlackJson';
 
 export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	const body: SlackRequest = req.body;
@@ -49,14 +48,40 @@ async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown
 
 	await pingUsersToReact(channel, ts);
 
-	const chatResp = await slack.chat.postMessage({
+	// echo for debug reasons
+	if (isEchoRequest(event)) {
+		await slack.chat.postMessage({
+			channel: event.channel,
+			thread_ts: event.thread_ts || undefined,
+			blocks: [
+				{
+					"type": "section",
+					"text": {
+						"type": "mrkdwn",
+						"text": `Echoing your message, <@${event.user}>!`
+					}
+				},
+				{
+					"type": "section",
+					"text": {
+						"type": "mrkdwn",
+						"text": "```" + JSON.stringify(event, null, 2) + "```"
+					}
+				}
+			]
+		});
+		return { code: 200, response: {} };
+	}
+
+	await slack.chat.postMessage({
 		channel: event.channel,
+		thread_ts: event.thread_ts || undefined,
 		blocks: [
 			{
 				"type": "section",
 				"text": {
 					"type": "mrkdwn",
-					"text": `Hi there, <@${event.user}>!`
+					"text": `Ackbotting your message, <@${event.user}>!`
 				}
 			},
 			{
@@ -68,13 +93,23 @@ async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown
 			}
 		]
 	});
-	console.log('chat response: ', chatResp);
+
 	return { code: 200, response: {} };
 }
 
-// async function getUsersToReact(msgTs: string): Promise<string[]> {
-// 	return [];
-// }
+function isEchoRequest(event: AppMentionEvent): boolean {
+	const firstBlock: Block = event?.blocks[0];
+	if (firstBlock?.type === 'rich_text') {
+		const firstFirstBlock = firstBlock?.elements[0];
+		if (firstFirstBlock?.type === 'rich_text_section') {
+			const firstFirstFirstBlock = firstFirstBlock?.elements[0];
+			if (firstFirstFirstBlock.type === 'text' && firstFirstFirstBlock.text === 'echo ') {
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
 async function pingUsersToReact(channel: string, ts: string): Promise<void> {
 	console.log('pinging users to react: ', channel, ts);
