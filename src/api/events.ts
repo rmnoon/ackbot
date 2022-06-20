@@ -57,7 +57,7 @@ async function onReaction(event: ReactionAddedEvent | ReactionRemovedEvent): Pro
 }
 
 async function checkMessageAcks(channel: string, ts: string) {
-	const thisUser = await slack.users.identity({});
+	const thisUser = await slack.auth.test({});
 
 	const history = await slack.conversations.history({
 		channel: channel,
@@ -88,15 +88,15 @@ async function checkMessageAcks(channel: string, ts: string) {
 		}
 	}
 
-	if (usersShouldReact.has(thisUser.user.id)) {
+	if (usersShouldReact.has(thisUser.bot_id)) {
 		// react from the bot to acknowledge the request and to prevent us from DM'ing ourselves
 		await slack.reactions.add({
 			channel: channel,
 			timestamp: ts,
 			name: 'thumbsup',
 		});
-		usersDidReact.add(thisUser.user.id);
-		usersShouldReact.delete(thisUser.user.id);
+		usersDidReact.add(thisUser.bot_id);
+		usersShouldReact.delete(thisUser.bot_id);
 	}
 
 	const usersToPing = [...usersShouldReact].filter(u => !usersDidReact.has(u));
