@@ -2,7 +2,7 @@
   "dependencies": {
     "@slack/web-api": "^6.7.2",
     "@upstash/redis": "^1.1.0",
-    "bluebird": "^3.7.2",
+    "bluebird": "^3.5.36",
     "@types/bluebird": "^3.5.36",
     "node-fetch": "^2.6.7",
     "vercel": "^24.0.0"
