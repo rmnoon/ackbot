@@ -1,7 +1,7 @@
 import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import * as crypto from 'crypto';
 import { AppMentionEvent, SlackRequest, Block, AnyEvent, ReactionAddedEvent, ReactionRemovedEvent } from './_SlackJson';
+import { cleanReq, isValidSlackRequest } from './_util';
 
 /** if true we'll echo debug information in slack, too */
 const DEBUG_LOG_TO_SLACK = true;
@@ -16,7 +16,7 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 		return;
 	}
 
-	if (!isValidSlackRequest(req, SLACK_SIGNING_SECRET)) {
+	if (!isValidSlackRequest(req, SLACK_SIGNING_SECRET, true)) {
 		console.error('Invalid slack request', { req: cleanReq(req) });
 		res.status(403).send({});
 		return;
@@ -188,29 +188,4 @@ async function log(where: { channel: string, threadTs?: string }, message: strin
 			]
 		});
 	}
-}
-
-function isValidSlackRequest(event: VercelRequest, signingSecret: string): boolean {
-	const requestBody = JSON.stringify(event.body);
-	const headers = event.headers;
-	const timestamp = headers['x-slack-request-timestamp'];
-	const slackSignature = headers['x-slack-signature'];
-	const baseString = 'v0:' + timestamp + ':' + requestBody;
-
-	const hmac = crypto
-		.createHmac('sha256', signingSecret)
-		.update(baseString)
-		.digest('hex');
-	const computedSlackSignature = 'v0=' + hmac;
-
-	return computedSlackSignature === slackSignature;
-}
-
-function cleanReq(req: VercelRequest) {
-	return {
-		method: req.method,
-		url: req.url,
-		headers: req.headers,
-		body: req.body
-	};
 }
