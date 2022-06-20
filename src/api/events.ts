@@ -51,7 +51,22 @@ async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown
 
 	const chatResp = await slack.chat.postMessage({
 		channel: event.channel,
-		text: `Hi there! Thanks for mentioning me, <@${event.user}>! ${JSON.stringify(event)}`
+		blocks: [
+			{
+				"type": "section",
+				"text": {
+					"type": "mrkdwn",
+					"text": `Hi there, <@${event.user}>!`
+				}
+			},
+			{
+				"type": "section",
+				"text": {
+					"type": "mrkdwn",
+					"text": "```" + JSON.stringify(event, null, 2) + "```"
+				}
+			}
+		]
 	});
 	console.log('chat response: ', chatResp);
 	return { code: 200, response: {} };
