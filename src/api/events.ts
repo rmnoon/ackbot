@@ -123,6 +123,7 @@ async function checkMessageAcks(channel: string, ts: string) {
 			text: `<@${message.user}> requested that you acknowledge this message by reacting to it: ${permalink}`
 		});
 	}, DEFAULT_CONCURRENCY);
+
 }
 
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
