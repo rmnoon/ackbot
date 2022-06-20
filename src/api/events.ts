@@ -1,7 +1,7 @@
 import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
-import { AppMentionEvent, SlackRequest } from './SlackJson';
+import { AppMentionEvent, SlackRequest } from './_SlackJson';
 
 
 export default async function onEvent(req: VercelRequest, res: VercelResponse) {
@@ -42,12 +42,44 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 
 async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown, code: number }> {
 	console.log('mention', event);
+	const channel = event.channel;
+	const ts = event.ts;
+
+	console.log('onAppMention: ', event);
+
+	await pingUsersToReact(channel, ts);
+
 	const chatResp = await slack.chat.postMessage({
 		channel: event.channel,
 		text: `Hi there! Thanks for mentioning me, <@${event.user}>!`
 	});
 	console.log('chat response: ', chatResp);
 	return { code: 200, response: {} };
+}
+
+// async function getUsersToReact(msgTs: string): Promise<string[]> {
+// 	return [];
+// }
+
+async function pingUsersToReact(channel: string, ts: string): Promise<void> {
+	console.log('pinging users to react: ', channel, ts);
+	// who needs to react?
+	// const shouldReact = new Set<string>();
+
+	// // who has reacted?
+	// const hasReacted = new Set<string>();
+	// const reactionsResp = await slack.reactions.get({
+	// 	channel: channel,
+	// 	timestamp: ts,
+	// 	full: true
+	// });
+	// for (const reaction of reactionsResp?.message?.reactions || []) {
+	// 	for (const reactor of reaction.users) {
+	// 		hasReacted.add(reactor);
+	// 	}
+	// }
+
+	return;
 }
 
 function isValidSlackRequest(event: VercelRequest, signingSecret: string): boolean {
