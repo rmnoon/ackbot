@@ -116,7 +116,6 @@ async function checkMessageAcks(channel: string, ts: string) {
 	// 		]
 	// 	});
 	// }, { concurrency: DEFAULT_CONCURRENCY });
-
 }
 
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
