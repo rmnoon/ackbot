@@ -59,6 +59,7 @@ async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown
 	await slack.chat.postMessage({
 		channel: event.channel,
 		thread_ts: event.thread_ts || undefined,
+		text: `Ackbotting your message, <@${event.user}>!`,
 		blocks: [
 			{
 				"type": "section",
@@ -96,7 +97,7 @@ async function checkMessageAcks(channel: string, ts: string) {
 		inclusive: true
 	});
 
-	console.log('history: ', { history });
+	console.log('history: ', { history: JSON.stringify(history, null, 2) });
 }
 
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
@@ -149,6 +150,7 @@ async function checkDebugEcho(event: AnyEvent) {
 	await slack.chat.postMessage({
 		channel: channel,
 		thread_ts: threadTs,
+		text: 'Echoing event!',
 		blocks: [
 			{
 				"type": "section",
