@@ -1,16 +1,16 @@
 import type { VercelRequest } from '@vercel/node';
 import * as crypto from 'crypto';
-import * as querystring from 'querystring';
+import type { Readable } from 'node:stream';
 
 /** See: https://api.slack.com/authentication/verifying-requests-from-slack */
-export function isValidSlackRequest(req: VercelRequest, slackAppSigningSecret: string, logging = false) {
+export async function isValidSlackRequest(req: VercelRequest, slackAppSigningSecret: string, logging = false): Promise<boolean> {
 	if (!slackAppSigningSecret) {
 		throw new Error('Invalid slack app signing secret');
 	}
 	const headers = toHeaders(req.headers);
 	const slackRequestTimestamp = getHeader('X-Slack-Request-Timestamp', headers);
 	const slackSignature = getHeader('X-Slack-Signature', headers);
-	const bodyPayload = fixedEncodeURIComponent(querystring.stringify(req.body).replace(/%20/g, '+')); // Fix for #1
+	const bodyPayload = await getRawBody(req);
 	if (!(slackRequestTimestamp && slackSignature && bodyPayload)) {
 		if (logging) console.log(`Missing part in Slack's request`);
 		return false;
@@ -63,12 +63,17 @@ export function getHeaders(header: string, headers: { k: string, v: string }[], 
 	return found;
 }
 
-/**
- * Adhering to RFC 3986
- * Inspired from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
- */
-function fixedEncodeURIComponent(str: string): string {
-	return str.replace(/[!'()*~]/g, (c) => {
-		return '%' + c.charCodeAt(0).toString(16).toUpperCase();
-	});
+/** See: https://vercel.com/support/articles/how-do-i-get-the-raw-body-of-a-serverless-function */
+export async function getRawBody(req: VercelRequest): Promise<string> {
+	const buf = await buffer(req);
+	const rawBody = buf.toString('utf8');
+	return rawBody;
+}
+
+async function buffer(readable: Readable) {
+	const chunks = [];
+	for await (const chunk of readable) {
+		chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+	}
+	return Buffer.concat(chunks);
 }

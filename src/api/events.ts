@@ -1,7 +1,7 @@
 import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AppMentionEvent, SlackRequest, Block, AnyEvent, ReactionAddedEvent, ReactionRemovedEvent } from './_SlackJson';
-import { cleanReq, isValidSlackRequest } from './_util';
+import { isValidSlackRequest } from './_util';
 
 /** if true we'll echo debug information in slack, too */
 const DEBUG_LOG_TO_SLACK = true;
@@ -16,7 +16,7 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 		return;
 	}
 
-	if (!isValidSlackRequest(req, SLACK_SIGNING_SECRET, true)) {
+	if (!await isValidSlackRequest(req, SLACK_SIGNING_SECRET)) {
 		console.error('Invalid slack request', { req: cleanReq(req) });
 		res.status(403).send({});
 		return;
@@ -188,4 +188,13 @@ async function log(where: { channel: string, threadTs?: string }, message: strin
 			]
 		});
 	}
+}
+
+function cleanReq(req: VercelRequest) {
+	return {
+		method: req.method,
+		url: req.url,
+		headers: req.headers,
+		body: JSON.stringify(req.body)
+	};
 }
