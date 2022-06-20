@@ -16,7 +16,7 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 		return;
 	}
 
-	if (!await isValidSlackRequest(req, SLACK_SIGNING_SECRET)) {
+	if (!await isValidSlackRequest(req, SLACK_SIGNING_SECRET, true)) {
 		console.error('Invalid slack request', { req: cleanReq(req) });
 		res.status(403).send({});
 		return;
