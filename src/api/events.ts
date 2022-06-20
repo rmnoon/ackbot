@@ -1,10 +1,14 @@
 import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
+import * as bluebird from 'bluebird';
 import { AppMentionEvent, SlackRequest, Block, AnyEvent, ReactionAddedEvent, ReactionRemovedEvent } from './_SlackJson';
 
 /** if true we'll echo debug information in slack, too */
 const DEBUG_LOG_TO_SLACK = true;
+
+/** for trivially parallelizable operations how many should we have in flight at once at most? */
+const DEFAULT_CONCURRENCY = 3;
 
 export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	const body: SlackRequest = req.body;
@@ -17,13 +21,13 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	}
 
 	if (!isValidSlackRequest(req, SLACK_SIGNING_SECRET)) {
-		console.error('Invalid slack request', { req });
+		console.error('Invalid slack request', { req: cleanReq(req) });
 		res.status(403).send({});
 		return;
 	}
 
 	if (body.type !== 'event_callback') {
-		console.error('Unexpected request type', { req });
+		console.error('Unexpected request type', { req: cleanReq(req) });
 		res.status(400).send({});
 		return;
 	}
@@ -40,7 +44,7 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 		}
 		res.status(code).send(response);
 	} catch (e) {
-		console.error('Unexpected error: ', { e });
+		console.error('Unexpected error: ', { error: JSON.stringify(e.message | e), req: cleanReq(req) });
 		res.status(500).send({ msg: 'Unexpected error' });
 	}
 }
@@ -84,16 +88,35 @@ async function checkMessageAcks(channel: string, ts: string) {
 	}
 
 	const usersShouldReact = new Set(mentions.userIds);
-	for (const groupId of mentions.userGroupIds) {
+	await bluebird.map(mentions.userGroupIds, async groupId => {
 		const groupResp = await slack.usergroups.users.list({
 			usergroup: groupId
 		});
 		for (const user of groupResp.users || []) {
 			usersShouldReact.add(user);
 		}
-	}
+	}, { concurrency: DEFAULT_CONCURRENCY });
 
-	await log({ channel, threadTs: ts }, 'ready to send reminders', { message, mentions, reactions, usersDidReact: [...usersDidReact], usersShouldReact: [...usersShouldReact] });
+	const usersToPing = [...usersShouldReact].filter(u => !usersDidReact.has(u));
+
+	await log({ channel, threadTs: ts }, 'ready to send reminders', { message, mentions, reactions, usersDidReact: [...usersDidReact], usersShouldReact: [...usersShouldReact], usersToPing });
+
+	// await bluebird.map(usersToPing, async userToPing => {
+	// 	await slack.chat.postMessage({
+	// 		channel: userToPing,
+	// 		text: 'Please ack',
+	// 		blocks: [
+	// 			{
+	// 				type: 'section',
+	// 				text: {
+	// 					type: 'mrkdwn',
+	// 					text: 'Please ack',
+	// 				}
+	// 			},
+	// 		]
+	// 	});
+	// }, { concurrency: DEFAULT_CONCURRENCY });
+
 }
 
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
@@ -184,4 +207,13 @@ function isValidSlackRequest(event: VercelRequest, signingSecret: string): boole
 	const computedSlackSignature = 'v0=' + hmac;
 
 	return computedSlackSignature === slackSignature;
+}
+
+function cleanReq(req: VercelRequest) {
+	return {
+		method: req.method,
+		url: req.url,
+		headers: req.headers,
+		body: req.body
+	};
 }
