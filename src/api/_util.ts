@@ -114,3 +114,30 @@ async function buffer(readable: Readable) {
 	}
 	return Buffer.concat(chunks);
 }
+
+/** bluebird doesnt work in vercel for some reason so i just adapted https://betterprogramming.pub/implement-your-own-bluebird-style-promise-map-in-js-7c081b7ad02c */
+export function map<T, U>(iterable: Iterable<T>, mapper: (item: T, idx: number) => Promise<U>, concurrency = Infinity): Promise<U[]> {
+	let index = 0;
+	const results: U[] = [];
+	const pending: Promise<U>[] = [];
+	const iterator = iterable[Symbol.iterator]();
+
+	while (concurrency-- > 0) {
+		const thread = wrappedMapper();
+		if (thread) pending.push(thread);
+		else break;
+	}
+
+	return Promise.all(pending).then(() => results);
+
+	function wrappedMapper(): Promise<U> {
+		const next = iterator.next();
+		if (next.done) return null;
+		const i = index++;
+		const mapped = mapper(next.value, i);
+		return Promise.resolve(mapped).then(resolved => {
+			results[i] = resolved;
+			return wrappedMapper();
+		});
+	}
+}

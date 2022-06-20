@@ -92,11 +92,15 @@ async function checkMessageAcks(channel: string, ts: string) {
 
 	if (usersShouldReact.has(thisBotId)) {
 		// react from the bot to acknowledge the request and to prevent us from DM'ing ourselves
-		await slack.reactions.add({
-			channel: channel,
-			timestamp: ts,
-			name: 'thumbsup',
-		});
+		try {
+			await slack.reactions.add({
+				channel: channel,
+				timestamp: ts,
+				name: 'thumbsup',
+			});
+		} catch (e) {
+			// ok to silently fail here, slack reactions aren't super consistent so we'll get "aleady reacted" from them pretty commonly
+		}
 		usersDidReact.add(thisBotId);
 		usersShouldReact.delete(thisBotId);
 	}
