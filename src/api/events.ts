@@ -1,14 +1,10 @@
 import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
-import * as bluebird from 'bluebird';
 import { AppMentionEvent, SlackRequest, Block, AnyEvent, ReactionAddedEvent, ReactionRemovedEvent } from './_SlackJson';
 
 /** if true we'll echo debug information in slack, too */
 const DEBUG_LOG_TO_SLACK = true;
-
-/** for trivially parallelizable operations how many should we have in flight at once at most? */
-const DEFAULT_CONCURRENCY = 3;
 
 export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	const body: SlackRequest = req.body;
@@ -88,14 +84,14 @@ async function checkMessageAcks(channel: string, ts: string) {
 	}
 
 	const usersShouldReact = new Set(mentions.userIds);
-	await bluebird.map(mentions.userGroupIds, async groupId => {
+	for (const groupId of mentions.userGroupIds) {
 		const groupResp = await slack.usergroups.users.list({
 			usergroup: groupId
 		});
 		for (const user of groupResp.users || []) {
 			usersShouldReact.add(user);
 		}
-	}, { concurrency: DEFAULT_CONCURRENCY });
+	}
 
 	const usersToPing = [...usersShouldReact].filter(u => !usersDidReact.has(u));
 
@@ -117,7 +113,7 @@ async function checkMessageAcks(channel: string, ts: string) {
 	// 	});
 	// }, { concurrency: DEFAULT_CONCURRENCY });
 
-	
+
 }
 
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
