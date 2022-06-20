@@ -8,6 +8,8 @@
   ],
   "rules": {
     "indent": ["error", "tab", { "SwitchCase": 1 }],
-    "semi": [2, "always"]
+    "semi": [2, "always"],
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-empty-interface": "off"
   }
 }

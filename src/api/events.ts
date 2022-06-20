@@ -1,8 +1,11 @@
 import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
-import { AppMentionEvent, SlackRequest, Block } from './_SlackJson';
+import { AppMentionEvent, SlackRequest, Block, AnyEvent } from './_SlackJson';
 import { AckRequest } from './_AckJson';
+
+/** if true we'll try and echo the event somewhere relevant into slack to aid debugging */
+const DEBUG_ECHO_EVENT = true;
 
 export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	const body: SlackRequest = req.body;
@@ -27,6 +30,7 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	}
 
 	try {
+		await checkDebugEcho(body.event);
 		let response: unknown = {};
 		let code = 400;
 		switch (body.event.type) {
@@ -42,31 +46,6 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 
 async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown, code: number }> {
 	console.log('onAppMention: ', event);
-
-	// echo for debug on message types
-	if (isEchoRequest(event)) {
-		await slack.chat.postMessage({
-			channel: event.channel,
-			thread_ts: event.thread_ts || undefined,
-			blocks: [
-				{
-					"type": "section",
-					"text": {
-						"type": "mrkdwn",
-						"text": `Echoing your message, <@${event.user}>!`
-					}
-				},
-				{
-					"type": "section",
-					"text": {
-						"type": "mrkdwn",
-						"text": "```" + JSON.stringify(event, null, 2) + "```"
-					}
-				}
-			]
-		});
-		return { code: 200, response: {} };
-	}
 
 	const req: AckRequest = {
 		channel: event.channel,
@@ -104,13 +83,9 @@ function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGro
 	let userGroupIds: string[] = [];
 
 	for (const block of blocks || []) {
+		if (!block || !block.type) continue;
+
 		switch (block.type) {
-			case 'rich_text':
-			case 'rich_text_section':
-				const recursed = getUsersAndGroupMentions(block.elements);
-				userIds = [...new Set([...userIds, ...recursed.userIds])];
-				userGroupIds = [...new Set([...userGroupIds, ...recursed.userGroupIds])];
-				break;
 			case 'user':
 				userIds.push(block.user_id);
 				break;
@@ -118,6 +93,13 @@ function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGro
 				userGroupIds.push(block.usergroup_id);
 				break;
 			default:
+				// don't have complete typings so let's just take a shortcut on element arrays
+				const elements = (block as any).elements;
+				if (Array.isArray(elements)) {
+					const recursed = getUsersAndGroupMentions(elements);
+					userIds = [...new Set([...userIds, ...recursed.userIds])];
+					userGroupIds = [...new Set([...userGroupIds, ...recursed.userGroupIds])];			
+				}
 				break;
 		}
 	}
@@ -125,18 +107,44 @@ function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGro
 	return { userIds, userGroupIds };
 }
 
-function isEchoRequest(event: AppMentionEvent): boolean {
-	const firstBlock: Block = event?.blocks[0];
-	if (firstBlock?.type === 'rich_text') {
-		const firstFirstBlock = firstBlock?.elements[0];
-		if (firstFirstBlock?.type === 'rich_text_section') {
-			const firstFirstFirstBlock = firstFirstBlock?.elements[0];
-			if (firstFirstFirstBlock.type === 'text' && firstFirstFirstBlock.text === 'echo ') {
-				return true;
-			}
-		}
+async function checkDebugEcho(event: AnyEvent) {
+	if (!DEBUG_ECHO_EVENT) return;
+
+	let channel: string;
+	let threadTs: string;
+	switch (event.type) {
+		case 'app_mention':
+			channel = event.channel;
+			threadTs = event.thread_ts;
+			break;
+		case 'reaction_added':
+		case 'reaction_removed':
+			channel = event.item.channel;
+			break;
+		default:
+			break;
 	}
-	return false;
+
+	await slack.chat.postMessage({
+		channel: channel,
+		thread_ts: threadTs,
+		blocks: [
+			{
+				"type": "section",
+				"text": {
+					"type": "mrkdwn",
+					"text": `Echoing event:`
+				}
+			},
+			{
+				"type": "section",
+				"text": {
+					"type": "mrkdwn",
+					"text": "```" + JSON.stringify(event, null, 2) + "```"
+				}
+			}
+		]
+	});	
 }
 
 function isValidSlackRequest(event: VercelRequest, signingSecret: string): boolean {
