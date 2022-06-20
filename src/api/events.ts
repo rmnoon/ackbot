@@ -4,8 +4,8 @@ import * as crypto from 'crypto';
 import { AppMentionEvent, SlackRequest, Block, AnyEvent, ReactionAddedEvent, ReactionRemovedEvent } from './_SlackJson';
 import { AckRequest } from './_AckJson';
 
-/** if true we'll try and echo the event somewhere relevant into slack to aid debugging */
-const DEBUG_ECHO_EVENT = true;
+/** if true we'll echo debug information in slack, too */
+const DEBUG_LOG_TO_SLACK = true;
 
 export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	const body: SlackRequest = req.body;
@@ -30,7 +30,7 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 	}
 
 	try {
-		await checkDebugEcho(body.event);
+		await logEvent(body.event);
 		let response: unknown = {};
 		let code = 400;
 		switch (body.event.type) {
@@ -41,14 +41,12 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 		}
 		res.status(code).send(response);
 	} catch (e) {
-		console.log('Unexpected error: ', { e });
+		console.error('Unexpected error: ', { e });
 		res.status(500).send({ msg: 'Unexpected error' });
 	}
 }
 
 async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown, code: number }> {
-	console.log('onAppMention: ', { event });
-
 	const req: AckRequest = {
 		channel: event.channel,
 		ts: event.ts,
@@ -62,14 +60,14 @@ async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown
 		text: `Ackbotting your message, <@${event.user}>!`,
 		blocks: [
 			{
-				"type": "section",
+				type: 'section',
 				"text": {
 					"type": "mrkdwn",
 					"text": `Ackbotting your message, <@${event.user}>!`
 				}
 			},
 			{
-				"type": "section",
+				type: 'section',
 				"text": {
 					"type": "mrkdwn",
 					"text": "```" + JSON.stringify({ event, req, mentions }, null, 2) + "```"
@@ -82,22 +80,41 @@ async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown
 }
 
 async function onReaction(event: ReactionAddedEvent | ReactionRemovedEvent): Promise<{ response: unknown, code: number }> {
-	console.log('onReaction: ', { event });
 	await checkMessageAcks(event.item.channel, event.item.ts);
 	return { code: 200, response: {} };
 }
 
 async function checkMessageAcks(channel: string, ts: string) {
-	console.log('checkMessageAcks', { channel, ts });
-
 	const history = await slack.conversations.history({
 		channel: channel,
 		latest: ts,
 		limit: 1,
 		inclusive: true
 	});
+	await log({ channel, threadTs: ts }, 'checking message', { history });
 
-	console.log('history: ', { history: JSON.stringify(history, null, 2) });
+	const message = history.messages[0];
+	const mentions = getUsersAndGroupMentions(message.blocks as Block[]);
+	const reactions = message.reactions;
+
+	const usersDidReact = new Set<string>();
+	for (const r of reactions) {
+		for (const u of r.users) {
+			usersDidReact.add(u);
+		}
+	}
+
+	const usersShouldReact = new Set(mentions.userIds);
+	for (const groupId of mentions.userGroupIds) {
+		const groupResp = await slack.usergroups.users.list({
+			usergroup: groupId
+		});
+		for (const user of groupResp.users || []) {
+			usersShouldReact.add(user);
+		}
+	}
+
+	await log({ channel, threadTs: ts }, 'ready to send reminders', { message, mentions, reactions, usersDidReact: [...usersDidReact], usersShouldReact: [...usersShouldReact] });
 }
 
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
@@ -129,9 +146,7 @@ function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGro
 	return { userIds, userGroupIds };
 }
 
-async function checkDebugEcho(event: AnyEvent) {
-	if (!DEBUG_ECHO_EVENT) return;
-
+async function logEvent(event: AnyEvent) {
 	let channel: string;
 	let threadTs: string;
 	switch (event.type) {
@@ -146,28 +161,34 @@ async function checkDebugEcho(event: AnyEvent) {
 		default:
 			break;
 	}
+	await log({ channel, threadTs }, `Received event: ${event.type}`, event);
+}
 
-	await slack.chat.postMessage({
-		channel: channel,
-		thread_ts: threadTs,
-		text: 'Echoing event!',
-		blocks: [
-			{
-				"type": "section",
-				"text": {
-					"type": "mrkdwn",
-					"text": `Echoing event:`
+async function log(where: { channel: string, threadTs?: string }, message: string, json: unknown) {
+	console.log(message, { json });
+	if (DEBUG_LOG_TO_SLACK) {
+		await slack.chat.postMessage({
+			channel: where.channel,
+			thread_ts: where.threadTs || undefined,
+			text: message,
+			blocks: [
+				{
+					type: 'section',
+					text: {
+						type: 'mrkdwn',
+						text: message,
+					}
+				},
+				{
+					type: 'section',
+					text: {
+						type: 'mrkdwn',
+						text: '```' + JSON.stringify(json, null, 2) + '```',
+					}
 				}
-			},
-			{
-				"type": "section",
-				"text": {
-					"type": "mrkdwn",
-					"text": "```" + JSON.stringify(event, null, 2) + "```"
-				}
-			}
-		]
-	});
+			]
+		});
+	}
 }
 
 function isValidSlackRequest(event: VercelRequest, signingSecret: string): boolean {
