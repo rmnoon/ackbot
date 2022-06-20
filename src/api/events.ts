@@ -40,7 +40,7 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 		}
 		res.status(code).send(response);
 	} catch (e) {
-		console.error('Unexpected error: ', { error: JSON.stringify(e.message | e), req: cleanReq(req) });
+		console.error('Unexpected error: ', { error: e, req: cleanReq(req) });
 		res.status(500).send({ msg: 'Unexpected error' });
 	}
 }
