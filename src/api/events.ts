@@ -2,7 +2,6 @@ import { slack, SLACK_SIGNING_SECRET } from './_constants';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
 import { AppMentionEvent, SlackRequest, Block, AnyEvent, ReactionAddedEvent, ReactionRemovedEvent } from './_SlackJson';
-import { AckRequest } from './_AckJson';
 
 /** if true we'll echo debug information in slack, too */
 const DEBUG_LOG_TO_SLACK = true;
@@ -47,34 +46,7 @@ export default async function onEvent(req: VercelRequest, res: VercelResponse) {
 }
 
 async function onAppMention(event: AppMentionEvent): Promise<{ response: unknown, code: number }> {
-	const req: AckRequest = {
-		channel: event.channel,
-		ts: event.ts,
-		thread_ts: event.thread_ts,
-	};
-	const mentions = getUsersAndGroupMentions(event.blocks);
-
-	await slack.chat.postMessage({
-		channel: event.channel,
-		thread_ts: event.thread_ts || undefined,
-		text: `Ackbotting your message, <@${event.user}>!`,
-		blocks: [
-			{
-				type: 'section',
-				"text": {
-					"type": "mrkdwn",
-					"text": `Ackbotting your message, <@${event.user}>!`
-				}
-			},
-			{
-				type: 'section',
-				"text": {
-					"type": "mrkdwn",
-					"text": "```" + JSON.stringify({ event, req, mentions }, null, 2) + "```"
-				}
-			}
-		]
-	});
+	await checkMessageAcks(event.channel, event.ts);
 
 	return { code: 200, response: {} };
 }
@@ -85,6 +57,13 @@ async function onReaction(event: ReactionAddedEvent | ReactionRemovedEvent): Pro
 }
 
 async function checkMessageAcks(channel: string, ts: string) {
+	// react from the bot to acknowledge the request and so that we don't have to know our own userid, lol
+	await slack.reactions.add({
+		channel: channel,
+		timestamp: ts,
+		name: 'thumbsup',
+	});
+
 	const history = await slack.conversations.history({
 		channel: channel,
 		latest: ts,
