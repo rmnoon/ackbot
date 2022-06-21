@@ -1,4 +1,8 @@
 {
+  "name": "ackbot",
+  "version": "0.1",
+  "author": "Ryan Noon <rmnoon@cs.stanford.edu> (https://rmnoon.github.io)",
+  "license": "MIT",
   "dependencies": {
     "@slack/web-api": "^6.7.2",
     "@upstash/redis": "^1.1.0",
