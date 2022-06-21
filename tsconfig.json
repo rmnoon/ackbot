@@ -8,5 +8,6 @@
         "noUnusedParameters": false,
         "suppressImplicitAnyIndexErrors": true,
         "target": "ES6",
+        "allowSyntheticDefaultImports": true,
     }
 }

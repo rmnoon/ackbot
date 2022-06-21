@@ -1,6 +1,6 @@
 // import { Redis } from '@upstash/redis';
 import { WebClient } from '@slack/web-api';
-import * as postgres from 'postgres';
+import postgres from 'postgres';
 
 export const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 
