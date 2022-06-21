@@ -1,8 +1,19 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkForReminders } from './_acks';
-import { cleanReq } from './_util';
+import { ACKBOT_VERIFY } from './_constants';
+import { cleanReq, getHeader, toHeaders } from './_util';
 
 export default async function onCheck(req: VercelRequest, res: VercelResponse) {
+	const headers = toHeaders(req.headers);
+	const verify = getHeader('x-ackbot-verify', headers);
+	if (!verify) {
+		res.status(403).send({ msg: 'Missing verify header.'});
+		return;
+	}
+	if (verify !== ACKBOT_VERIFY) {
+		res.status(403).send({ msg: 'Invalid verify header.'});
+		return;		
+	}
 
 	try {
 		res.status(200).send(await checkForReminders());
