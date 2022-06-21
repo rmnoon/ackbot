@@ -44,14 +44,15 @@ export async function checkForReminders() {
 	const incomplete: { channel: string, ts: string }[] = [];
 
 	// check each of them
-	map(vals, async val => {
+	map(vals, async (val, idx) => {
 		const [channel, ts] = val.split(':');
+		console.log('checkForReminders val: ', { channel, ts, val, idx });
 		try {
 			const { isComplete } = await checkMessageAcks(channel, ts, false);
 			if (isComplete) {
 				complete.push({ channel, ts });
 			} else {
-				incomplete.push({ channel, ts});
+				incomplete.push({ channel, ts });
 			}
 		} catch (e) {
 			console.error('checkForReminders error: ', { error: e, val });
@@ -66,7 +67,7 @@ export async function checkForReminders() {
 		await saveReminders(incomplete);
 	}
 
-	return { vals, complete, incomplete };
+	return { vals, complete, incomplete, now, upperBound };
 }
 
 async function saveReminders(reminders: { channel: string, ts: string }[]): Promise<void> {
@@ -77,7 +78,7 @@ async function saveReminders(reminders: { channel: string, ts: string }[]): Prom
 }
 
 export async function checkMessageAcks(channel: string, ts: string, saveReminder = true): Promise<{ isComplete: boolean }> {
-
+	console.log('checkMessageAcks starting: ', { channel, ts, saveReminder });
 	const thisBotId = (await slack.auth.test({})).user_id;
 
 	const history = await slack.conversations.history({
