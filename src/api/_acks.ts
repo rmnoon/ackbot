@@ -11,6 +11,8 @@ const REMINDER_FREQUENCY_MIN = 5;
 
 const REMINDER_FREQUENCY_MS = REMINDER_FREQUENCY_MIN * 60 * 1000;
 
+const DEBUG_CHECK_ALL = true;
+
 export async function checkForRemindersSql() {
 	const now = new Date().getTime();
 	const test = await sql`
@@ -32,37 +34,36 @@ export async function checkForRemindersSql() {
 
 export async function checkForReminders() {
 	const now = new Date().getTime();
-	console.log('checkForReminders: ', { now });
+	console.log('checkForReminders started: ', { now });
 
 	// get k items with a check time eligible for a reminder
-	const vals = await redis.zrange(REDIS_ACK_KEY, '-inf', now - REMINDER_FREQUENCY_MS, { byScore: true }) as string[];
+	const upperBound = DEBUG_CHECK_ALL ? '+inf' : now - REMINDER_FREQUENCY_MS;
+	const vals = await redis.zrange(REDIS_ACK_KEY, '-inf', upperBound, { byScore: true }) as string[];
 
-	console.log('checkForReminders: ', { now, vals });
-	// const complete: string[] = [];
+	console.log('checkForReminders got reminders: ', { now, vals });
+	const completed: string[] = [];
 
 	// check each of them
-	// map(vals, async val => {
-	// 	const [channel, ts] = val.split(':');
-	// 	try {
-	// 		const { isComplete } = await checkMessageAcks(channel, ts);
-	// 		if (isComplete) {
-	// 			complete.push(val);
-	// 		}
-	// 	} catch (e) {
-	// 		console.error('checkForReminders error: ', { error: e, val });
-	// 	}
-	// }, DEFAULT_CONCURRENCY);
+	map(vals, async val => {
+		const [channel, ts] = val.split(':');
+		try {
+			const { isComplete } = await checkMessageAcks(channel, ts);
+			if (isComplete) {
+				completed.push(val);
+			}
+		} catch (e) {
+			console.error('checkForReminders error: ', { error: e, val });
+		}
+	}, DEFAULT_CONCURRENCY);
 
 	// remove any that are now complete
-	// await redis.zrem(REDIS_ACK_KEY, ...complete);
+	await redis.zrem(REDIS_ACK_KEY, ...completed);
 
-	return { vals };
+	return { vals, completed };
 }
 
 async function saveReminder(channel: string, ts: string): Promise<void> {
-	console.log('saving reminder: ', { channel, ts });
-	await redis.zadd(REDIS_ACK_KEY, { score: 100, member: `${channel}:${ts}` });
-	console.log('reminder saved: ', { channel, ts });
+	await redis.zadd(REDIS_ACK_KEY, { score: new Date().getTime(), member: `${channel}:${ts}` });
 }
 
 export async function checkMessageAcks(channel: string, ts: string): Promise<{ isComplete: boolean }> {

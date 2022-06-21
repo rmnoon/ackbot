@@ -4,13 +4,10 @@ import postgres from 'postgres';
 
 export const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 
-const redisOpts = {
+export const redis = new Redis({
 	url: process.env.UPSTASH_REDIS_REST_URL,
 	token: process.env.UPSTASH_REDIS_REST_TOKEN,
-};
-console.log('redisOpts: ', { redisOpts });
-
-export const redis = new Redis(redisOpts);
+});
 
 export const sql = postgres({
 	host: process.env.PGHOST,
