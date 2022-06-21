@@ -5,7 +5,6 @@ import postgres from 'postgres';
 export const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 
 export const redis = new Redis({
-	automaticDeserialization: false,
 	url: process.env.UPSTASH_REDIS_REST_URL,
 	token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
