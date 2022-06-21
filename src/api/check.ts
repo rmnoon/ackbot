@@ -7,10 +7,12 @@ export default async function onCheck(req: VercelRequest, res: VercelResponse) {
 	const headers = toHeaders(req.headers);
 	const verify = getHeader('x-ackbot-verify', headers);
 	if (!verify) {
+		console.error('Missing verify: ', { req: cleanReq(req) });
 		res.status(403).send({ msg: 'Missing verify header.'});
 		return;
 	}
 	if (verify !== ACKBOT_VERIFY) {
+		console.error('Invalid verify: ', { verify, req: cleanReq(req) });
 		res.status(403).send({ msg: 'Invalid verify header.'});
 		return;		
 	}
