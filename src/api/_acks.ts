@@ -34,22 +34,24 @@ export async function checkForRemindersSql() {
 
 export async function checkForReminders() {
 	const now = new Date().getTime();
-	console.log('checkForReminders started: ', { now });
-
-	// get k items with a check time eligible for a reminder
 	const upperBound = DEBUG_CHECK_ALL ? '+inf' : now - REMINDER_FREQUENCY_MS;
-	const vals = await redis.zrange(REDIS_ACK_KEY, '-inf', upperBound, { byScore: true }) as string[];
+	console.log('checkForReminders started: ', { now, upperBound });
 
+	const vals = await redis.zrange(REDIS_ACK_KEY, '-inf', upperBound, { byScore: true }) as string[];
 	console.log('checkForReminders got reminders: ', { now, vals });
-	const completed: string[] = [];
+
+	const complete: { channel: string, ts: string }[] = [];
+	const incomplete: { channel: string, ts: string }[] = [];
 
 	// check each of them
 	map(vals, async val => {
 		const [channel, ts] = val.split(':');
 		try {
-			const { isComplete } = await checkMessageAcks(channel, ts);
+			const { isComplete } = await checkMessageAcks(channel, ts, false);
 			if (isComplete) {
-				completed.push(val);
+				complete.push({ channel, ts });
+			} else {
+				incomplete.push({ channel, ts});
 			}
 		} catch (e) {
 			console.error('checkForReminders error: ', { error: e, val });
@@ -57,16 +59,24 @@ export async function checkForReminders() {
 	}, DEFAULT_CONCURRENCY);
 
 	// remove any that are now complete
-	await redis.zrem(REDIS_ACK_KEY, ...completed);
+	if (complete.length > 0) {
+		await redis.zrem(REDIS_ACK_KEY, ...complete.map(c => `${c.channel}:${c.ts}`));
+	}
+	if (incomplete.length > 0) {
+		await saveReminders(incomplete);
+	}
 
-	return { vals, completed };
+	return { vals, complete, incomplete };
 }
 
-async function saveReminder(channel: string, ts: string): Promise<void> {
-	await redis.zadd(REDIS_ACK_KEY, { score: new Date().getTime(), member: `${channel}:${ts}` });
+async function saveReminders(reminders: { channel: string, ts: string }[]): Promise<void> {
+	const score = new Date().getTime();
+	const adds = reminders.map(r => ({ score, member: `${r.channel}:${r.ts}` }));
+	const first = adds.shift();
+	redis.zadd(REDIS_ACK_KEY, first, ...adds); // dirty hack because these typings are disgusting
 }
 
-export async function checkMessageAcks(channel: string, ts: string): Promise<{ isComplete: boolean }> {
+export async function checkMessageAcks(channel: string, ts: string, saveReminder = true): Promise<{ isComplete: boolean }> {
 
 	const thisBotId = (await slack.auth.test({})).user_id;
 
@@ -135,8 +145,8 @@ export async function checkMessageAcks(channel: string, ts: string): Promise<{ i
 	}, DEFAULT_CONCURRENCY);
 
 	const isComplete = usersToPing.length === 0;
-	if (!isComplete) {
-		await saveReminder(channel, ts);
+	if (!isComplete && saveReminder) {
+		await saveReminders([{ channel, ts }]);
 	}
 	return { isComplete };
 }
