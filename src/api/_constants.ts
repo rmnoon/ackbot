@@ -1,11 +1,21 @@
-import { Redis } from '@upstash/redis';
+// import { Redis } from '@upstash/redis';
 import { WebClient } from '@slack/web-api';
+import * as postgres from 'postgres';
 
 export const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 
-export const redis = new Redis({
-	url: process.env.UPSTASH_REDIS_REST_URL,
-	token: process.env.UPSTASH_REDIS_REST_TOKEN,
+// export const redis = new Redis({
+// 	automaticDeserialization: false,
+// 	url: process.env.UPSTASH_REDIS_REST_URL,
+// 	token: process.env.UPSTASH_REDIS_REST_TOKEN,
+// });
+
+export const sql = postgres({
+	host: process.env.PGHOST,
+	// port: process.env.NEON_PORT,
+	database: process.env.PGDATABASE,
+	username: process.env.PGUSER,
+	password: process.env.PGPASSWORD,
 });
 
 export const slack = new WebClient(process.env.SLACK_BOT_TOKEN);

@@ -1,11 +1,38 @@
-import { slack } from './_constants';
+import { sql, slack } from './_constants';
 import { log } from './_Slack';
 import { Block } from './_SlackJson';
 import { map } from './_util';
 
 const DEFAULT_CONCURRENCY = 3;
 
-export async function checkMessageAcks(channel: string, ts: string) {
+// const REDIS_ACK_KEY = 'acks';
+
+// const CHECK_BATCH_SIZE = 100;
+
+// const REMINDER_FREQUENCY_MIN = 5;
+
+// const REMINDER_FREQUENCY_MS = REMINDER_FREQUENCY_MIN * 60 * 1000;
+
+export async function checkForReminders() {
+	const now = new Date().getTime();
+	const test = await sql`
+    insert into ackbot
+      (checktime, channel, ts)
+    values
+      (${now}, ${'lolchannel'}, ${'lolts'})
+    returning name, age
+	`;
+
+	console.log('test: ', { test });
+	return test;
+	// get k items with a check time earlier than a day ago
+
+	// check each of them
+
+	// for any not done yet enqueue them with their most recent check time
+}
+
+export async function checkMessageAcks(channel: string, ts: string): Promise<void> {
 
 	const thisBotId = (await slack.auth.test({})).user_id;
 
@@ -68,7 +95,7 @@ export async function checkMessageAcks(channel: string, ts: string) {
 	map(usersToPing, async userToPing => {
 		await slack.chat.postMessage({
 			channel: userToPing,
-			text: `<@${message.user}> requested that you acknowledge this message by reacting to it: ${permalink}`
+			text: `Hey <@${userToPing}>! Heads up that <@${message.user}> requested you acknowledge their message by reacting to it: ${permalink}`
 		});
 	}, DEFAULT_CONCURRENCY);
 

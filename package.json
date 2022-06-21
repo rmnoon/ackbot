@@ -3,6 +3,7 @@
     "@slack/web-api": "^6.7.2",
     "@upstash/redis": "^1.1.0",
     "node-fetch": "^2.6.7",
+    "postgres": "^3.2.4",
     "vercel": "^24.0.0"
   },
   "devDependencies": {
