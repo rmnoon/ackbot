@@ -10,12 +10,14 @@ export const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 // 	token: process.env.UPSTASH_REDIS_REST_TOKEN,
 // });
 
-export const sql = postgres({
+const pgOptions = {
 	host: process.env.PGHOST,
 	database: process.env.PGDATABASE,
 	username: process.env.PGUSER,
 	password: process.env.PGPASSWORD,
-	ssl: { rejectUnauthorized: false }
-});
+	ssl: 'require' as const,
+};
+console.log('pg: ', { pgOptions});
+export const sql = postgres(pgOptions);
 
 export const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
