@@ -16,6 +16,7 @@ export const sql = postgres({
 	database: process.env.PGDATABASE,
 	username: process.env.PGUSER,
 	password: process.env.PGPASSWORD,
+	ssl: true
 });
 
 export const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
