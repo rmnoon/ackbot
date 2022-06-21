@@ -44,7 +44,7 @@ export async function checkForReminders() {
 	const incomplete: { channel: string, ts: string }[] = [];
 
 	// check each of them
-	map(vals, async (val, idx) => {
+	await map(vals, async (val, idx) => {
 		const [channel, ts] = val.split(':');
 		console.log('checkForReminders val: ', { channel, ts, val, idx });
 		try {
@@ -55,7 +55,7 @@ export async function checkForReminders() {
 				incomplete.push({ channel, ts });
 			}
 		} catch (e) {
-			console.error('checkForReminders error: ', { error: e, val });
+			console.error('checkForReminders error: ', { error: e, val, idx });
 		}
 	}, DEFAULT_CONCURRENCY);
 
@@ -74,7 +74,7 @@ async function saveReminders(reminders: { channel: string, ts: string }[]): Prom
 	const score = new Date().getTime();
 	const adds = reminders.map(r => ({ score, member: `${r.channel}:${r.ts}` }));
 	const first = adds.shift();
-	redis.zadd(REDIS_ACK_KEY, first, ...adds); // dirty hack because these typings are disgusting
+	await redis.zadd(REDIS_ACK_KEY, first, ...adds); // dirty hack because these typings are disgusting
 }
 
 export async function checkMessageAcks(channel: string, ts: string, saveReminder = true): Promise<{ isComplete: boolean }> {
@@ -102,10 +102,10 @@ export async function checkMessageAcks(channel: string, ts: string, saveReminder
 			usersDidReact.add(u);
 		}
 	}
-
+	4;
 	const usersShouldReact = new Set(mentions.userIds);
 
-	map(mentions.userGroupIds, async groupId => {
+	await map(mentions.userGroupIds, async groupId => {
 		const groupResp = await slack.usergroups.users.list({
 			usergroup: groupId
 		});
@@ -138,7 +138,7 @@ export async function checkMessageAcks(channel: string, ts: string, saveReminder
 
 	await log({ channel, threadTs: ts }, 'ready to send reminders', { message, mentions, reactions, usersDidReact: [...usersDidReact], usersShouldReact: [...usersShouldReact], usersToPing });
 
-	map(usersToPing, async userToPing => {
+	await map(usersToPing, async userToPing => {
 		await slack.chat.postMessage({
 			channel: userToPing,
 			text: `Hey <@${userToPing}>! Heads up that <@${message.user}> requested you acknowledge their message by reacting to it: ${permalink}`
