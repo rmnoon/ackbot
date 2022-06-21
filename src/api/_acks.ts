@@ -32,11 +32,12 @@ export async function checkForRemindersSql() {
 
 export async function checkForReminders() {
 	const now = new Date().getTime();
+	console.log('checkForReminders: ', { now });
 
 	// get k items with a check time eligible for a reminder
 	const vals = await redis.zrange(REDIS_ACK_KEY, '-inf', now - REMINDER_FREQUENCY_MS, { byScore: true }) as string[];
 
-	console.log('checkForReminders: ', { vals });
+	console.log('checkForReminders: ', { now, vals });
 	// const complete: string[] = [];
 
 	// check each of them
@@ -54,6 +55,8 @@ export async function checkForReminders() {
 
 	// remove any that are now complete
 	// await redis.zrem(REDIS_ACK_KEY, ...complete);
+
+	return { vals };
 }
 
 async function saveReminder(channel: string, ts: string): Promise<void> {
