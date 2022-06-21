@@ -1,19 +1,17 @@
-import { sql, slack } from './_constants';
+import { sql, slack, redis } from './_constants';
 import { log } from './_Slack';
 import { Block } from './_SlackJson';
 import { map } from './_util';
 
 const DEFAULT_CONCURRENCY = 3;
 
-// const REDIS_ACK_KEY = 'acks';
+const REDIS_ACK_KEY = 'acks';
 
-// const CHECK_BATCH_SIZE = 100;
+const REMINDER_FREQUENCY_MIN = 5;
 
-// const REMINDER_FREQUENCY_MIN = 5;
+const REMINDER_FREQUENCY_MS = REMINDER_FREQUENCY_MIN * 60 * 1000;
 
-// const REMINDER_FREQUENCY_MS = REMINDER_FREQUENCY_MIN * 60 * 1000;
-
-export async function checkForReminders() {
+export async function checkForRemindersSql() {
 	const now = new Date().getTime();
 	const test = await sql`
     insert into ackbot
@@ -32,7 +30,37 @@ export async function checkForReminders() {
 	// for any not done yet enqueue them with their most recent check time
 }
 
-export async function checkMessageAcks(channel: string, ts: string): Promise<void> {
+export async function checkForReminders() {
+	const now = new Date().getTime();
+
+	// get k items with a check time eligible for a reminder
+	const vals = await redis.zrange(REDIS_ACK_KEY, '-inf', now - REMINDER_FREQUENCY_MS, { byScore: true }) as string[];
+
+	console.log('checkForReminders: ', { vals });
+	const complete: string[] = [];
+
+	// check each of them
+	map(vals, async val => {
+		const [channel, ts] = val.split(':');
+		try {
+			const { isComplete } = await checkMessageAcks(channel, ts);
+			if (isComplete) {
+				complete.push(val);
+			}
+		} catch (e) {
+			console.error('checkForReminders error: ', { error: e, val });
+		}
+	}, DEFAULT_CONCURRENCY);
+
+	// remove any that are now complete
+	await redis.zrem(REDIS_ACK_KEY, ...complete);
+}
+
+export async function saveReminder(channel: string, ts: string): Promise<void> {
+	await redis.zadd(REDIS_ACK_KEY, { score: new Date().getTime(), member: `${channel}:${ts}` });
+}
+
+export async function checkMessageAcks(channel: string, ts: string): Promise<{ isComplete: boolean }> {
 
 	const thisBotId = (await slack.auth.test({})).user_id;
 
@@ -46,6 +74,7 @@ export async function checkMessageAcks(channel: string, ts: string): Promise<voi
 	const message = history.messages[0];
 	if (!message) {
 		await log({ channel, threadTs: ts }, 'missing message, deleted?', { history, thisBotId });
+		return { isComplete: true };
 	}
 	const mentions = getUsersAndGroupMentions(message.blocks as Block[]);
 	const reactions = message.reactions || [];
@@ -99,6 +128,8 @@ export async function checkMessageAcks(channel: string, ts: string): Promise<voi
 		});
 	}, DEFAULT_CONCURRENCY);
 
+	const isComplete = usersToPing.length === 0;
+	return { isComplete };
 }
 
 function getUsersAndGroupMentions(blocks: Block[]): { userIds: string[], userGroupIds: string[] } {
