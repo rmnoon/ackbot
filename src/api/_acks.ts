@@ -1,4 +1,4 @@
-import { sql, slack, redis } from './_constants';
+import { slack, redis } from './_constants';
 import { log } from './_Slack';
 import { Block } from './_SlackJson';
 import { map } from './_util';
@@ -7,30 +7,11 @@ const DEFAULT_CONCURRENCY = 3;
 
 const REDIS_ACK_KEY = 'acks';
 
-const REMINDER_FREQUENCY_MIN = 1;
+const REMINDER_FREQUENCY_MIN = 24 * 60;
 
 const REMINDER_FREQUENCY_MS = REMINDER_FREQUENCY_MIN * 60 * 1000;
 
 const DEBUG_CHECK_ALL = false;
-
-export async function checkForRemindersSql() {
-	const now = new Date().getTime();
-	const test = await sql`
-    insert into ackbot
-      (checktime, channel, ts)
-    values
-      (${now}, ${'lolchannel'}, ${'lolts'})
-    returning name, age
-	`;
-
-	console.log('test: ', { test });
-	return test;
-	// get k items with a check time earlier than a day ago
-
-	// check each of them
-
-	// for any not done yet enqueue them with their most recent check time
-}
 
 export async function checkForReminders() {
 	const now = new Date().getTime();
@@ -66,7 +47,7 @@ export async function checkForReminders() {
 	if (incomplete.length > 0) {
 		await saveReminders(incomplete);
 	}
-
+	console.log('checkForReminders done: ', { vals, complete, incomplete, now, upperBound });
 	return { vals, complete, incomplete, now, upperBound };
 }
 
