@@ -4,7 +4,7 @@ import { slack } from './_constants';
 import { getHeader, getRawBody, toHeaders } from './_util';
 
 /** if true we'll echo debug information in slack, too */
-const DEBUG_LOG_TO_SLACK = true;
+const DEBUG_LOG_TO_SLACK = false;
 
 /** See: https://api.slack.com/authentication/verifying-requests-from-slack */
 export async function isValidSlackRequest(req: VercelRequest, signingSecret: string, logging = false) {

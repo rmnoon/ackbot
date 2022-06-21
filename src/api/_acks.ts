@@ -7,11 +7,11 @@ const DEFAULT_CONCURRENCY = 3;
 
 const REDIS_ACK_KEY = 'acks';
 
-const REMINDER_FREQUENCY_MIN = 5;
+const REMINDER_FREQUENCY_MIN = 1;
 
 const REMINDER_FREQUENCY_MS = REMINDER_FREQUENCY_MIN * 60 * 1000;
 
-const DEBUG_CHECK_ALL = true;
+const DEBUG_CHECK_ALL = false;
 
 export async function checkForRemindersSql() {
 	const now = new Date().getTime();
