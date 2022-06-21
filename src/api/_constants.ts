@@ -12,7 +12,7 @@ export const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 
 export const sql = postgres({
 	host: process.env.PGHOST,
-	// port: process.env.NEON_PORT,
+	port: 5432,
 	database: process.env.PGDATABASE,
 	username: process.env.PGUSER,
 	password: process.env.PGPASSWORD,
