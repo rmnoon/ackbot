@@ -37,26 +37,26 @@ export async function checkForReminders() {
 	const vals = await redis.zrange(REDIS_ACK_KEY, '-inf', now - REMINDER_FREQUENCY_MS, { byScore: true }) as string[];
 
 	console.log('checkForReminders: ', { vals });
-	const complete: string[] = [];
+	// const complete: string[] = [];
 
 	// check each of them
-	map(vals, async val => {
-		const [channel, ts] = val.split(':');
-		try {
-			const { isComplete } = await checkMessageAcks(channel, ts);
-			if (isComplete) {
-				complete.push(val);
-			}
-		} catch (e) {
-			console.error('checkForReminders error: ', { error: e, val });
-		}
-	}, DEFAULT_CONCURRENCY);
+	// map(vals, async val => {
+	// 	const [channel, ts] = val.split(':');
+	// 	try {
+	// 		const { isComplete } = await checkMessageAcks(channel, ts);
+	// 		if (isComplete) {
+	// 			complete.push(val);
+	// 		}
+	// 	} catch (e) {
+	// 		console.error('checkForReminders error: ', { error: e, val });
+	// 	}
+	// }, DEFAULT_CONCURRENCY);
 
 	// remove any that are now complete
-	await redis.zrem(REDIS_ACK_KEY, ...complete);
+	// await redis.zrem(REDIS_ACK_KEY, ...complete);
 }
 
-export async function saveReminder(channel: string, ts: string): Promise<void> {
+async function saveReminder(channel: string, ts: string): Promise<void> {
 	await redis.zadd(REDIS_ACK_KEY, { score: new Date().getTime(), member: `${channel}:${ts}` });
 }
 
@@ -129,6 +129,9 @@ export async function checkMessageAcks(channel: string, ts: string): Promise<{ i
 	}, DEFAULT_CONCURRENCY);
 
 	const isComplete = usersToPing.length === 0;
+	if (!isComplete) {
+		await saveReminder(channel, ts);
+	}
 	return { isComplete };
 }
 

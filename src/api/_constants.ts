@@ -10,14 +10,12 @@ export const redis = new Redis({
 	token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-const pgOptions = {
+export const sql = postgres({
 	host: process.env.PGHOST,
 	database: process.env.PGDATABASE,
 	username: process.env.PGUSER,
 	password: process.env.PGPASSWORD,
-	ssl: 'require' as const,
-};
-console.log('pg: ', { pgOptions});
-export const sql = postgres(pgOptions);
+	ssl: 'require',
+});
 
 export const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
