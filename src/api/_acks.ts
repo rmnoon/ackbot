@@ -61,7 +61,7 @@ export async function checkForReminders() {
 
 async function saveReminder(channel: string, ts: string): Promise<void> {
 	console.log('saving reminder: ', { channel, ts });
-	await redis.zadd(REDIS_ACK_KEY, { score: new Date().getTime(), member: `${channel}:${ts}` });
+	await redis.zadd(REDIS_ACK_KEY, { score: 100, member: `${channel}:${ts}` });
 	console.log('reminder saved: ', { channel, ts });
 }
 
