@@ -1,2 +1,2 @@
 # ackbot
-ackbot makes it easy to get your team to acknowledge important messages
+ackbot makes it easy to help people on your team acknowledge important messages
