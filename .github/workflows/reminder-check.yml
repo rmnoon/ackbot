@@ -17,4 +17,4 @@ jobs:
       with:
         url: 'https://ackbot.vercel.app/api/check'
         method: 'GET'
-        customHeaders: '{"X-Ackbot-Verify": ${{ secrets.ACKBOT_VERIFY }}}'
+        customHeaders: ${{ format('{{"X-Ackbot-Verify": "{0}"}}', secrets.ACKBOT_VERIFY) }}
