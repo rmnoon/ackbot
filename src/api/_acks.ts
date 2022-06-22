@@ -122,7 +122,7 @@ export async function checkMessageAcks(channel: string, ts: string, saveReminder
 	await map(usersToPing, async userToPing => {
 		await slack.chat.postMessage({
 			channel: userToPing,
-			text: `Hey <@${userToPing}>! Heads up that <@${message.user}> requested you acknowledge their message by reacting to it: ${permalink}`
+			text: `Hey <@${userToPing}>! Heads up that <@${message.user}> (who is super awesome) requested you acknowledge their message by reacting to it: ${permalink}`
 		});
 	}, DEFAULT_CONCURRENCY);
 
