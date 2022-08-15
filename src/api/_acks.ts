@@ -83,7 +83,6 @@ export async function checkMessageAcks(channel: string, ts: string, saveReminder
 			usersDidReact.add(u);
 		}
 	}
-	4;
 	const usersShouldReact = new Set(mentions.userIds);
 
 	await map(mentions.userGroupIds, async groupId => {
