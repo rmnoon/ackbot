@@ -13,20 +13,20 @@ const REMINDER_FREQUENCY_MS = REMINDER_FREQUENCY_MIN * 60 * 1000;
 
 const DEBUG_CHECK_ALL = false;
 
-const now = new Date().getTime();
+const NOW = new Date().getTime();
 
 export async function checkForReminders() {
-	const upperBound = DEBUG_CHECK_ALL ? '+inf' : now - REMINDER_FREQUENCY_MS;
-	console.log('checkForReminders started: ', { now, upperBound });
+	const upperBound = DEBUG_CHECK_ALL ? '+inf' : NOW - REMINDER_FREQUENCY_MS;
+	console.log('checkForReminders started: ', { now: NOW, upperBound });
 
 	const vals = await redis.zrange(REDIS_ACK_KEY, '-inf', upperBound, { byScore: true }) as string[];
-	console.log('checkForReminders got reminders: ', { now, vals });
+	console.log('checkForReminders got reminders: ', { now: NOW, vals });
 
 	const complete: { channel: string, ts: string }[] = [];
 	const incomplete: { channel: string, ts: string }[] = [];
-	const messageTS: number = now;
+	// const messageTS: number = NOW;
 	const timeoutValue: number = 30 * 24 * 60 * 60 * 1000;  //timeoutTime set to 30 days by default
-	const timeoutDate = messageTS - timeoutValue;
+	const timeoutDate = NOW - timeoutValue;
 	// check each of them
 	await map(vals, async (val, idx) => {
 		const [channel, ts] = val.split(':');
@@ -35,7 +35,7 @@ export async function checkForReminders() {
 			const { isComplete } = await checkMessageAcks(channel, ts, false);
 			if (isComplete) {
 				complete.push({ channel, ts });
-			} else if (timeoutDate > now ) {
+			} else if (timeoutDate + timeoutValue < NOW ) {
 				complete.push({ channel, ts });
 			}
 			else {
@@ -53,8 +53,8 @@ export async function checkForReminders() {
 	if (incomplete.length > 0) {
 		await saveReminders(incomplete);
 	}
-	console.log('checkForReminders done: ', { vals, complete, incomplete, now, upperBound });
-	return { vals, complete, incomplete, now, upperBound };
+	console.log('checkForReminders done: ', { vals, complete, incomplete, now: NOW, upperBound });
+	return { vals, complete, incomplete, now: NOW, upperBound };
 }
 
 async function saveReminders(reminders: { channel: string, ts: string }[]): Promise<void> {
