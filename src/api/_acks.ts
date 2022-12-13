@@ -15,6 +15,8 @@ const DEBUG_CHECK_ALL = false;
 
 const NOW = new Date().getTime();
 
+const TIMEOUT_INTERVAL = 30; //timeout interval in days (30 by default)
+
 export async function checkForReminders() {
 	const upperBound = DEBUG_CHECK_ALL ? '+inf' : NOW - REMINDER_FREQUENCY_MS;
 	console.log('checkForReminders started: ', { now: NOW, upperBound });
@@ -24,9 +26,7 @@ export async function checkForReminders() {
 
 	const complete: { channel: string, ts: string }[] = [];
 	const incomplete: { channel: string, ts: string }[] = [];
-	// const messageTS: number = NOW;
-	const timeoutValue: number = 30 * 24 * 60 * 60 * 1000;  //timeoutTime set to 30 days by default
-	const timeoutDate = NOW - timeoutValue;
+	const timeoutValue: number = TIMEOUT_INTERVAL * 24 * 60 * 60 * 1000;  
 	// check each of them
 	await map(vals, async (val, idx) => {
 		const [channel, ts] = val.split(':');
@@ -35,7 +35,7 @@ export async function checkForReminders() {
 			const { isComplete } = await checkMessageAcks(channel, ts, false);
 			if (isComplete) {
 				complete.push({ channel, ts });
-			} else if (timeoutDate + timeoutValue < NOW ) {
+			} else if ( parseInt(ts) + timeoutValue < NOW ) {
 				complete.push({ channel, ts });
 			}
 			else {
