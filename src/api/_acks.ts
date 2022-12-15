@@ -13,20 +13,19 @@ const REMINDER_FREQUENCY_MS = REMINDER_FREQUENCY_MIN * 60 * 1000;
 
 const DEBUG_CHECK_ALL = false;
 
-const NOW = new Date().getTime();
-
-const TIMEOUT_INTERVAL = 30; //timeout interval in days (30 by default)
+const TIMEOUT_INTERVAL = 30 * 24 * 60 * 60 * 1000; // Default timeout interval for ackbot message checking is 30d
 
 export async function checkForReminders() {
-	const upperBound = DEBUG_CHECK_ALL ? '+inf' : NOW - REMINDER_FREQUENCY_MS;
-	console.log('checkForReminders started: ', { now: NOW, upperBound });
+	const now = new Date().getTime();
+	const upperBound = DEBUG_CHECK_ALL ? '+inf' : now - REMINDER_FREQUENCY_MS;
+	console.log('checkForReminders started: ', { now: now, upperBound });
 
 	const vals = await redis.zrange(REDIS_ACK_KEY, '-inf', upperBound, { byScore: true }) as string[];
-	console.log('checkForReminders got reminders: ', { now: NOW, vals });
+	console.log('checkForReminders got reminders: ', { now: now, vals });
 
 	const complete: { channel: string, ts: string }[] = [];
 	const incomplete: { channel: string, ts: string }[] = [];
-	const timeoutValue: number = TIMEOUT_INTERVAL * 24 * 60 * 60 * 1000;  
+
 	// check each of them
 	await map(vals, async (val, idx) => {
 		const [channel, ts] = val.split(':');
@@ -35,7 +34,7 @@ export async function checkForReminders() {
 			const { isComplete } = await checkMessageAcks(channel, ts, false);
 			if (isComplete) {
 				complete.push({ channel, ts });
-			} else if ( parseInt(ts) + timeoutValue < NOW ) {
+			} else if (  now > parseInt(ts, 10) + TIMEOUT_INTERVAL ) { // At execution, check if the present time is after the day and time of the original message + 30 days, if so, mark the message as complete (because of timeout)
 				complete.push({ channel, ts });
 			}
 			else {
@@ -53,8 +52,8 @@ export async function checkForReminders() {
 	if (incomplete.length > 0) {
 		await saveReminders(incomplete);
 	}
-	console.log('checkForReminders done: ', { vals, complete, incomplete, now: NOW, upperBound });
-	return { vals, complete, incomplete, now: NOW, upperBound };
+	console.log('checkForReminders done: ', { vals, complete, incomplete, now: now, upperBound });
+	return { vals, complete, incomplete, now: now, upperBound };
 }
 
 async function saveReminders(reminders: { channel: string, ts: string }[]): Promise<void> {
